@@ -1,0 +1,2 @@
+enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
+
