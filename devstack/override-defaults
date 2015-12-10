@@ -1,0 +1,4 @@
+if is_service_enabled tempest && [[ -n "$CINDER_ENABLED_BACKENDS" ]] && [[ ,${CINDER_ENABLED_BACKENDS} =~ ,sofs: ]]; then
+    TEMPEST_VOLUME_VENDOR=Scality
+    TEMPEST_STORAGE_PROTOCOL=scality
+fi
