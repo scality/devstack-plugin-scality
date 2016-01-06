@@ -10,13 +10,28 @@ function configure_cinder_backend_sofs {
 }
 
 function init_cinder_backend_sofs {
-    if [[ -x "$(which sfused 2>/dev/null)" ]]; then
-        sudo service scality-sfused stop
-    fi
     if [[ ! -d $SCALITY_SOFS_MOUNT_POINT ]]; then
         sudo mkdir $SCALITY_SOFS_MOUNT_POINT
     fi
     sudo chmod +x $SCALITY_SOFS_MOUNT_POINT
+    
+    # We need to make sure we have a writable 'cinder' dir in SOFS
+    local sfused_mount_point=$(mount | grep "/dev/fuse" | grep -v scality | grep -v sproxyd | cut -d" " -f 3)
+    if [[ -z "sfused_mount_point" ]]; then
+        if ! sudo mount -t sofs $SCALITY_SOFS_CONFIG $SCALITY_SOFS_MOUNT_POINT; then
+    	    echo "Unable to mount the SOFS filesystem! Please check the configuration in $SCALITY_SOFS_CONFIG and the syslog."; exit 1
+        fi
+        sfused_mount_point=$SCALITY_SOFS_MOUNT_POINT
+    fi
+    if [[ ! -d $sfused_mount_point/cinder ]]; then
+        sudo mkdir $sfused_mount_point/cinder
+    fi
+    sudo chown $STACK_USER $sfused_mount_point/cinder
+    
+    sudo umount $sfused_mount_point
+    if [[ -x "$(which sfused 2>/dev/null)" ]]; then
+        sudo service scality-sfused stop
+    fi
 }
 
 
