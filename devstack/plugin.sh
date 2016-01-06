@@ -37,9 +37,11 @@ fi
 ### Nova
 ###################
 if is_service_enabled nova; then
-    if [[ -n "$CINDER_ENABLED_BACKENDS" ]] && [[ ,${CINDER_ENABLED_BACKENDS} =~ ,sofs: ]]; then
-        iniset $NOVA_CONF libvirt scality_sofs_config $SCALITY_SOFS_CONFIG
-        iniset $NOVA_CONF libvirt scality_sofs_mount_point $SCALITY_SOFS_MOUNT_POINT
+    if [[ "$1" == "stack" && "$2" == "post-config" ]]; then
+        if [[ -n "$CINDER_ENABLED_BACKENDS" ]] && [[ ,${CINDER_ENABLED_BACKENDS} =~ ,sofs: ]]; then
+            iniset $NOVA_CONF libvirt scality_sofs_config $SCALITY_SOFS_CONFIG
+            iniset $NOVA_CONF libvirt scality_sofs_mount_point $SCALITY_SOFS_MOUNT_POINT
+        fi
     fi
 fi
 
