@@ -65,7 +65,7 @@ fi
 ###################
 ### Swift
 ###################
-if is_service_enabled swift; then
+if is_service_enabled swift && [[ $USE_SCALITY_FOR_SWIFT == "True" ]]; then
     if [[ "$1" == "stack" && "$2" == "install" ]]; then
         sudo pip install https://github.com/scality/scality-sproxyd-client/archive/master.tar.gz
         sudo pip install https://github.com/scality/ScalitySproxydSwift/archive/master.tar.gz

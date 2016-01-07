@@ -6,6 +6,8 @@
 SCALITY_SOFS_CONFIG=${SCALITY_SOFS_CONFIG:-/etc/sfused.conf}
 SCALITY_SOFS_MOUNT_POINT=${SCALITY_SOFS_MOUNT_POINT:-/sofs}
 
+USE_SCALITY_FOR_SWIFT=$(trueorfalse True USE_SCALITY_FOR_SWIFT)
+
 ######### Swift Specific Configuration #########
 
 if [[ "$(basename $0)" != "unstack.sh" ]]; then
