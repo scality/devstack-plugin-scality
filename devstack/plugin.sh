@@ -17,7 +17,7 @@ function init_cinder_backend_sofs {
     
     # We need to make sure we have a writable 'cinder' dir in SOFS
     local sfused_mount_point=$(mount | grep "/dev/fuse" | grep -v scality | grep -v sproxyd | cut -d" " -f 3)
-    if [[ -z "sfused_mount_point" ]]; then
+    if [[ -z "${sfused_mount_point}" ]]; then
         if ! sudo mount -t sofs $SCALITY_SOFS_CONFIG $SCALITY_SOFS_MOUNT_POINT; then
     	    echo "Unable to mount the SOFS filesystem! Please check the configuration in $SCALITY_SOFS_CONFIG and the syslog."; exit 1
         fi
