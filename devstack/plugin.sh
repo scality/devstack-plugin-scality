@@ -143,6 +143,24 @@ if is_service_enabled manila; then
             iniset ${TEMPEST_DIR}/etc/tempest.conf share run_shrink_tests False
             iniset ${TEMPEST_DIR}/etc/tempest.conf share run_snapshot_tests False
             iniset ${TEMPEST_DIR}/etc/tempest.conf share run_consistency_group_tests False
+
+            # Remove the following line when https://review.openstack.org/#/c/263664 is reverted
+            # and https://bugs.launchpad.net/manila/+bug/1531049 is fixed
+            ADMIN_TENANT_NAME=${ADMIN_TENANT_NAME:-"admin"}
+            ADMIN_PASSWORD=${ADMIN_PASSWORD:-"secretadmin"}
+            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_username ${ADMIN_USERNAME:-"admin"}
+            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_password $ADMIN_PASSWORD
+            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_tenant_name $ADMIN_TENANT_NAME
+            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_domain_name ${ADMIN_DOMAIN_NAME:-"Default"}
+            iniset ${TEMPEST_DIR}/etc/tempest.conf identity username ${TEMPEST_USERNAME:-"demo"}
+            iniset ${TEMPEST_DIR}/etc/tempest.conf identity password $ADMIN_PASSWORD
+            iniset ${TEMPEST_DIR}/etc/tempest.conf identity tenant_name ${TEMPEST_TENANT_NAME:-"demo"}
+            iniset ${TEMPEST_DIR}/etc/tempest.conf identity alt_username ${ALT_USERNAME:-"alt_demo"}
+            iniset ${TEMPEST_DIR}/etc/tempest.conf identity alt_password $ADMIN_PASSWORD
+            iniset ${TEMPEST_DIR}/etc/tempest.conf identity alt_tenant_name ${ALT_TENANT_NAME:-"alt_demo"}
+            iniset ${TEMPEST_DIR}/etc/tempest.conf validation ip_version_for_ssh 4
+            iniset ${TEMPEST_DIR}/etc/tempest.conf validation ssh_timeout $BUILD_TIMEOUT
+            iniset ${TEMPEST_DIR}/etc/tempest.conf validation network_for_ssh ${PRIVATE_NETWORK_NAME:-"private"}
         else
             echo "Unable to configure tempest for the Scality Manila driver"
         fi
