@@ -7,11 +7,12 @@ SCALITY_SOFS_CONFIG=${SCALITY_SOFS_CONFIG:-/etc/sfused.conf}
 SCALITY_SOFS_MOUNT_POINT=${SCALITY_SOFS_MOUNT_POINT:-/sofs}
 
 USE_SCALITY_FOR_SWIFT=$(trueorfalse True USE_SCALITY_FOR_SWIFT)
+USE_SCALITY_FOR_GLANCE=$(trueorfalse True USE_SCALITY_FOR_GLANCE)
 
 ######### Swift Specific Configuration #########
 
 if [[ "$(basename $0)" != "unstack.sh" ]]; then
-    if (is_service_enabled s-proxy || is_service_enabled g-api) && [[ -z "$SCALITY_SPROXYD_ENDPOINTS" ]]; then
+    if ((is_service_enabled s-proxy && [[ "$USE_SCALITY_FOR_SWIFT" == "True" ]]) || (is_service_enabled g-api && [[ "$USE_SCALITY_FOR_GLANCE" == "True" ]] )) && [[ -z "$SCALITY_SPROXYD_ENDPOINTS" ]]; then
         echo "No value given for 'SCALITY_SPROXYD_ENDPOINTS'. Please edit your local.conf or set and export these variables."
         exit 1
     fi
