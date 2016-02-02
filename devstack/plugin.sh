@@ -131,7 +131,12 @@ if is_service_enabled manila; then
     if [[ "$1" == "stack" && "$2" == "extra" ]]; then
         source ${dir}/environment/netdef
         neutron net-create ringnet --shared --provider:network_type flat --provider:physical_network physnet
-        neutron subnet-create ringnet --allocation-pool ${TENANTS_POOL} --name ringsubnet ${TENANTS_NET}
+        neutron subnet-create ringnet --allocation-pool ${TENANTS_POOL} --name ringsubnet ${TENANTS_NET} \
+                              --enable-dhcp --host-route destination=${RINGNET_NFS},nexthop=${TENANT_NFS_GW} \
+                              --host-route destination=${RINGNET_SMB},nexthop=${TENANT_SMB_GW}
+
+        # Add IP to provider network bridge
+        sudo ip addr add ${TENANTS_BR} dev br-ringnet
 
         # Configure tempest
         TEMPEST_DIR=/opt/stack/tempest
