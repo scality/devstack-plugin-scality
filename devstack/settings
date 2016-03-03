@@ -8,6 +8,7 @@ SCALITY_SOFS_MOUNT_POINT=${SCALITY_SOFS_MOUNT_POINT:-/sofs}
 
 USE_SCALITY_FOR_SWIFT=$(trueorfalse True USE_SCALITY_FOR_SWIFT)
 USE_SCALITY_FOR_GLANCE=$(trueorfalse True USE_SCALITY_FOR_GLANCE)
+USE_SCALITY_FOR_MANILA=$(trueorfalse True USE_SCALITY_FOR_MANILA)
 
 ######### Swift Specific Configuration #########
 
@@ -18,7 +19,7 @@ if [[ "$(basename $0)" != "unstack.sh" ]]; then
     fi
 fi
 
-if is_service_enabled manila; then
+if is_service_enabled manila && [[ $USE_SCALITY_FOR_MANILA == "True" ]]; then
     if is_service_enabled nova-net || ! is_service_enabled neutron; then
         echo "For Manila to work, you need to enable Neutron Networking and disable Nova Networking."
         exit 1
