@@ -97,8 +97,6 @@ if is_service_enabled manila && [[ $USE_SCALITY_FOR_MANILA == "True" ]]; then
         source ${dir}/environment/netdef
 
         # Manila general section
-        export MANILA_PATH_TO_PUBLIC_KEY="${MANAGEMENT_KEY_PATH}.pub"
-        export MANILA_PATH_TO_PRIVATE_KEY=${MANAGEMENT_KEY_PATH}
         export MANILA_ENABLED_BACKENDS="ring"
         export MANILA_DEFAULT_SHARE_TYPE="scality"
         export MANILA_DEFAULT_SHARE_TYPE_EXTRA_SPECS="share_backend_name=scality_ring snapshot_support=False"
