@@ -10,6 +10,13 @@ USE_SCALITY_FOR_SWIFT=$(trueorfalse True USE_SCALITY_FOR_SWIFT)
 USE_SCALITY_FOR_GLANCE=$(trueorfalse True USE_SCALITY_FOR_GLANCE)
 USE_SCALITY_FOR_MANILA=$(trueorfalse True USE_SCALITY_FOR_MANILA)
 
+# In the most basic scenario, Neutron is not strictly required for Scality Manila driver
+# So let's give the possibility to run only nova-network
+CONFIGURE_NEUTRON_FOR_MANILA_WITH_SCALITY=$(trueorfalse True CONFIGURE_NEUTRON_FOR_MANILA_WITH_SCALITY)
+
+SCALITY_MANILA_CONFIGURE_NFS=$(trueorfalse True SCALITY_MANILA_CONFIGURE_NFS)
+SCALITY_MANILA_CONFIGURE_SMB=$(trueorfalse True SCALITY_MANILA_CONFIGURE_SMB)
+
 ######### Swift Specific Configuration #########
 
 if [[ "$(basename $0)" != "unstack.sh" ]]; then
@@ -19,7 +26,7 @@ if [[ "$(basename $0)" != "unstack.sh" ]]; then
     fi
 fi
 
-if is_service_enabled manila && [[ $USE_SCALITY_FOR_MANILA == "True" ]]; then
+if is_service_enabled manila && [[ $USE_SCALITY_FOR_MANILA == "True" ]] && [[ CONFIGURE_NEUTRON_FOR_MANILA_WITH_SCALITY == "True" ]]; then
     if is_service_enabled nova-net || ! is_service_enabled neutron; then
         echo "For Manila to work, you need to enable Neutron Networking and disable Nova Networking."
         exit 1
