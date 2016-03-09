@@ -87,10 +87,11 @@ fi
 ###################
 if is_service_enabled manila && [[ $USE_SCALITY_FOR_MANILA == "True" ]]; then
 
-    ### Stack ###
     if [[ "$1" == "stack" && "$2" == "pre-install" ]]; then
         # XXX In order to avoid constant rebase of upstream, do a dirty copy
-        git clone -b ${MANILA_BRANCH:-master} ${MANILA_REPO} /tmp/scality-manila
+        if [[ ! -d /tmp/scality-manila ]]; then
+            git clone -b ${MANILA_BRANCH:-master} ${MANILA_REPO} /tmp/scality-manila
+        fi
         cp -r /tmp/scality-manila/manila/share/drivers/scality \
             /opt/stack/manila/manila/share/drivers
 
@@ -105,72 +106,94 @@ if is_service_enabled manila && [[ $USE_SCALITY_FOR_MANILA == "True" ]]; then
         export MANILA_OPTGROUP_ring_driver_handles_share_servers=False
         export MANILA_OPTGROUP_ring_share_backend_name=scality_ring
         export MANILA_OPTGROUP_ring_share_driver=manila.share.drivers.scality.driver.ScalityShareDriver
-        export MANILA_OPTGROUP_ring_nfs_export_ip=${RINGNET_NFS_EXPORT_IP}
-        export MANILA_OPTGROUP_ring_nfs_management_host=${NFS_CONNECTOR_HOST}
-        export MANILA_OPTGROUP_ring_smb_export_ip=${RINGNET_SMB_EXPORT_IP}
-        export MANILA_OPTGROUP_ring_smb_management_host=${CIFS_CONNECTOR_HOST}
-        export MANILA_OPTGROUP_ring_smb_export_root=${SMB_EXPORT_ROOT:-/ring/fs}
         export MANILA_OPTGROUP_ring_management_user=${MANAGEMENT_USER}
         export MANILA_OPTGROUP_ring_ssh_key_path=${MANAGEMENT_KEY_PATH}
+
+        if [[ $SCALITY_MANILA_CONFIGURE_NFS == "True" ]]; then
+            export MANILA_OPTGROUP_ring_nfs_export_ip=${RINGNET_NFS_EXPORT_IP}
+            export MANILA_OPTGROUP_ring_nfs_management_host=${NFS_CONNECTOR_HOST}
+        fi
+
+        if [[ $SCALITY_MANILA_CONFIGURE_SMB == "True" ]]; then
+            export MANILA_OPTGROUP_ring_smb_export_ip=${RINGNET_SMB_EXPORT_IP}
+            export MANILA_OPTGROUP_ring_smb_management_host=${CIFS_CONNECTOR_HOST}
+            export MANILA_OPTGROUP_ring_smb_export_root=${SMB_EXPORT_ROOT:-/ring/fs}
+        fi
+
     fi
 
-    # install phase: Setup bridge
-    if [[ "$1" == "stack" && "$2" == "install" ]]; then
-        sudo ovs-vsctl add-br br-ringnet
-    fi
+    if [[ $CONFIGURE_NEUTRON_FOR_MANILA_WITH_SCALITY == "True" ]]; then
+        # install phase: Setup bridge
+        if [[ "$1" == "stack" && "$2" == "install" ]]; then
+            sudo ovs-vsctl add-br br-ringnet
+        fi
 
-	# post-config phase: Configure neutron
-    if [[ "$1" == "stack" && "$2" == "post-config" ]]; then
-        iniset /etc/neutron/plugins/ml2/ml2_conf.ini ml2_type_flat flat_networks physnet
-        iniset /etc/neutron/plugins/ml2/ml2_conf.ini ovs bridge_mappings physnet:br-ringnet
-    fi
+	    # post-config phase: Configure neutron
+        if [[ "$1" == "stack" && "$2" == "post-config" ]]; then
+            iniset /etc/neutron/plugins/ml2/ml2_conf.ini ml2_type_flat flat_networks physnet
+            iniset /etc/neutron/plugins/ml2/ml2_conf.ini ovs bridge_mappings physnet:br-ringnet
+        fi
 
-	# extra phase: Create neutron network for tenant use
-    if [[ "$1" == "stack" && "$2" == "extra" ]]; then
-        source ${dir}/environment/netdef
-        neutron net-create ringnet --shared --provider:network_type flat --provider:physical_network physnet
-        neutron subnet-create ringnet --allocation-pool ${TENANTS_POOL} --name ringsubnet ${TENANTS_NET} \
-                                --enable-dhcp --host-route destination=${RINGNET_NFS},nexthop=${TENANT_NFS_GW} \
-                                --host-route destination=${RINGNET_SMB},nexthop=${TENANT_SMB_GW}
+	    # extra phase: Create neutron network for tenant use
+        if [[ "$1" == "stack" && "$2" == "extra" ]]; then
+            source ${dir}/environment/netdef
+            neutron net-create ringnet --shared --provider:network_type flat --provider:physical_network physnet
 
-        # Add IP to provider network bridge
-        sudo ip addr add ${TENANTS_BR} dev br-ringnet
+            extra_routes=""
+            if [[ $SCALITY_MANILA_CONFIGURE_NFS == "True" ]]; then
+                extra_routes+="--host-route destination=${RINGNET_NFS},nexthop=${TENANT_NFS_GW} "
+            fi
+            if [[ $SCALITY_MANILA_CONFIGURE_SMB == "True" ]]; then
+                extra_routes+="--host-route destination=${RINGNET_SMB},nexthop=${TENANT_SMB_GW} "
+            fi
 
-        # Configure tempest
-        TEMPEST_DIR=/opt/stack/tempest
-        if [ -d ${TEMPEST_DIR} ]; then
-            iniset ${TEMPEST_DIR}/etc/tempest.conf service_available manila True
-            iniset ${TEMPEST_DIR}/etc/tempest.conf cli enabled True
-            iniset ${TEMPEST_DIR}/etc/tempest.conf share multitenancy_enabled False
-            iniset ${TEMPEST_DIR}/etc/tempest.conf share run_extend_tests False
-            iniset ${TEMPEST_DIR}/etc/tempest.conf share run_shrink_tests False
-            iniset ${TEMPEST_DIR}/etc/tempest.conf share run_snapshot_tests False
-            iniset ${TEMPEST_DIR}/etc/tempest.conf share run_consistency_group_tests False
+            neutron subnet-create ringnet --allocation-pool ${TENANTS_POOL} --name ringsubnet ${TENANTS_NET} \
+                                    --enable-dhcp $extra_routes
 
-            # Remove the following line when https://review.openstack.org/#/c/263664 is reverted
-            # and https://bugs.launchpad.net/manila/+bug/1531049 is fixed
-            ADMIN_TENANT_NAME=${ADMIN_TENANT_NAME:-"admin"}
-            ADMIN_PASSWORD=${ADMIN_PASSWORD:-"secretadmin"}
-            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_username ${ADMIN_USERNAME:-"admin"}
-            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_password $ADMIN_PASSWORD
-            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_tenant_name $ADMIN_TENANT_NAME
-            iniset ${TEMPEST_DIR}/etc/tempest.conf auth admin_domain_name ${ADMIN_DOMAIN_NAME:-"Default"}
-            iniset ${TEMPEST_DIR}/etc/tempest.conf identity username ${TEMPEST_USERNAME:-"demo"}
-            iniset ${TEMPEST_DIR}/etc/tempest.conf identity password $ADMIN_PASSWORD
-            iniset ${TEMPEST_DIR}/etc/tempest.conf identity tenant_name ${TEMPEST_TENANT_NAME:-"demo"}
-            iniset ${TEMPEST_DIR}/etc/tempest.conf identity alt_username ${ALT_USERNAME:-"alt_demo"}
-            iniset ${TEMPEST_DIR}/etc/tempest.conf identity alt_password $ADMIN_PASSWORD
-            iniset ${TEMPEST_DIR}/etc/tempest.conf identity alt_tenant_name ${ALT_TENANT_NAME:-"alt_demo"}
-            iniset ${TEMPEST_DIR}/etc/tempest.conf validation ip_version_for_ssh 4
-            iniset ${TEMPEST_DIR}/etc/tempest.conf validation ssh_timeout $BUILD_TIMEOUT
-            iniset ${TEMPEST_DIR}/etc/tempest.conf validation network_for_ssh ${PRIVATE_NETWORK_NAME:-"private"}
-        else
-            echo "Unable to configure tempest for the Scality Manila driver"
+            # Add IP to provider network bridge
+            sudo ip addr add ${TENANTS_BR} dev br-ringnet
+
+        fi
+
+        if [[ "$1" == "unstack" ]]; then
+            sudo ovs-vsctl del-br br-ringnet
         fi
     fi
+fi
 
-    if [[ "$1" == "unstack" ]]; then
-        sudo ovs-vsctl del-br br-ringnet
+
+
+###################
+### Tempest
+###################
+if is_service_enabled tempest && is_service_enabled manila && [[ $USE_SCALITY_FOR_MANILA == "True" ]]; then
+    if [[ "$1" == "stack" && "$2" == "extra" ]]; then
+        iniset $TEMPEST_CONFIG service_available manila True
+        iniset $TEMPEST_CONFIG cli enabled True
+        iniset $TEMPEST_CONFIG share multitenancy_enabled False
+        iniset $TEMPEST_CONFIG share run_extend_tests False
+        iniset $TEMPEST_CONFIG share run_shrink_tests False
+        iniset $TEMPEST_CONFIG share run_snapshot_tests False
+        iniset $TEMPEST_CONFIG share run_consistency_group_tests False
+
+        # Remove the following line when https://review.openstack.org/#/c/263664 is reverted
+        # and https://bugs.launchpad.net/manila/+bug/1531049 is fixed
+        ADMIN_TENANT_NAME=${ADMIN_TENANT_NAME:-"admin"}
+        ADMIN_PASSWORD=${ADMIN_PASSWORD:-"secretadmin"}
+        iniset $TEMPEST_CONFIG auth admin_username ${ADMIN_USERNAME:-"admin"}
+        iniset $TEMPEST_CONFIG auth admin_password $ADMIN_PASSWORD
+        iniset $TEMPEST_CONFIG auth admin_tenant_name $ADMIN_TENANT_NAME
+        iniset $TEMPEST_CONFIG auth admin_domain_name ${ADMIN_DOMAIN_NAME:-"Default"}
+        iniset $TEMPEST_CONFIG identity username ${TEMPEST_USERNAME:-"demo"}
+        iniset $TEMPEST_CONFIG identity password $ADMIN_PASSWORD
+        iniset $TEMPEST_CONFIG identity tenant_name ${TEMPEST_TENANT_NAME:-"demo"}
+        iniset $TEMPEST_CONFIG identity alt_username ${ALT_USERNAME:-"alt_demo"}
+        iniset $TEMPEST_CONFIG identity alt_password $ADMIN_PASSWORD
+        iniset $TEMPEST_CONFIG identity alt_tenant_name ${ALT_TENANT_NAME:-"alt_demo"}
+        iniset $TEMPEST_CONFIG validation ip_version_for_ssh 4
+        iniset $TEMPEST_CONFIG validation ssh_timeout $BUILD_TIMEOUT
+        iniset $TEMPEST_CONFIG validation network_for_ssh ${PRIVATE_NETWORK_NAME:-"private"}
+    else
+        echo "Unable to configure tempest for the Scality Manila driver"
     fi
-
 fi
